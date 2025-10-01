@@ -1,53 +1,36 @@
 package server
 
 import (
+	"log"
 	"net"
 	"net/rpc"
+	"rpc-example/types"
 	"sync"
 )
 
 type Kv struct {
-	mu sync.Mutex
-	data map[string]string
+	mu   sync.Mutex
+	Data map[string]string
 }
 
-type GetArgs struct {
-	Key string
-}
-
-type PutArgs struct {
-	Key string
-	Value string
-}
-
-type PutReply struct{}
-
-type GetReply struct {
-	Value string
-}
-
-type Server_t interface {
-	Get(key string, reply *GetReply) error
-	Put(key, value string, reply *GetReply) error
-}
-
-func Server() {
-	KV := new(Kv)
-	KV.data = map[string]string{}
+func Start() {
+	KV := &Kv{Data: map[string]string{}}
 
 	rpcs := rpc.NewServer()
-	rpcs.Register(KV)
+	err := rpcs.Register(KV)
+	if err != nil {
+		log.Fatal("Register error:", err)
+	}
 
 	l, e := net.Listen("tcp", ":8000")
 	if e != nil {
-		l.Close()
+		log.Fatal("Listen error:", e)
 	}
 
 	go func() {
 		for {
 			conn, e := l.Accept()
 			if e != nil {
-				conn.Close()
 				break
 			}
 			go rpcs.ServeConn(conn)
@@ -56,18 +39,16 @@ func Server() {
 	}()
 }
 
-func (KV *Kv) Get(args *GetArgs, reply *GetReply) error {
+func (KV *Kv) Get(args *types.GetArgs, reply *types.GetReply) error {
 	KV.mu.Lock()
 	defer KV.mu.Unlock()
-
-	reply.Value = KV.data[args.Key]
+	reply.Value = KV.Data[args.Key]
 	return nil
 }
 
-func (KV *Kv) Put(args *PutArgs, reply *PutReply) error {
+func (KV *Kv) Put(args *types.PutArgs, reply *types.PutReply) error {
 	KV.mu.Lock()
 	defer KV.mu.Unlock()
-
-	KV.data[args.Key] = args.Value
+	KV.Data[args.Key] = args.Value
 	return nil
 }

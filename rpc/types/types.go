@@ -1,12 +1,5 @@
 package types
 
-import "sync"
-
-type Kv struct {
-	mu   sync.Mutex
-	data map[string]string
-}
-
 type GetArgs struct {
 	Key string
 }

@@ -5,16 +5,22 @@ import (
 	types "rpc-example/types"
 )
 
-func connect() *rpc.Client {
-	client, e := rpc.Dial("tcp", "8000")
-	if e != nil {
-		client.Close()
-	}
-	return client
+type Client struct {
+	client *rpc.Client
 }
 
-func Get(key string) string {
-	client := connect()
+func Connect() (*Client, error) {
+	client, e := rpc.Dial("tcp", "8000")
+	if e != nil {
+		return nil, nil
+	}
+	return  &Client{
+		client,
+	} , nil
+}
+
+func (c *Client) Get(key string) string {
+	client := c.client
 	defer client.Close()
 
 	args := types.GetArgs {
@@ -28,8 +34,8 @@ func Get(key string) string {
 	return reply.Value
 }
 
-func Put(key string, val string) error {
-	client := connect()
+func (c *Client) Put(key string, val string) error {
+	client := c.client
 	defer client.Close()
 
 	args := types.PutArgs{ Key: key, Value: val }
@@ -39,4 +45,8 @@ func Put(key string, val string) error {
 		return err
 	}
 	return nil
+}
+
+func (c *Client) Close() {
+	c.client.Close()
 }
