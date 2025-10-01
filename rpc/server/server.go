@@ -3,9 +3,11 @@ package server
 import (
 	"net"
 	"net/rpc"
+	"sync"
 )
 
 type Kv struct {
+	mu sync.Mutex
 	data map[string]string
 }
 
@@ -46,18 +48,24 @@ func server() {
 			conn, e := l.Accept()
 			if e != nil {
 				conn.Close()
+				break
 			}
-
+			go rpcs.ServeConn(conn)
 		}
+		l.Close()
 	}()
 }
 
 func (KV *Kv) Get(args *GetArgs, reply *GetReply) error {
+	KV.mu.Lock()
 	reply.Value = KV.data[args.key]
+	KV.mu.Unlock()
 	return nil
 }
 
 func (KV *Kv) Put(args *PutArgs, reply *PutReply) error {
+	KV.mu.Lock()
 	KV.data[args.key] = args.value
+	KV.mu.Unlock()
 	return nil
 }
