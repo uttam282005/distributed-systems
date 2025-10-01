@@ -12,12 +12,12 @@ type Kv struct {
 }
 
 type GetArgs struct {
-	key string
+	Key string
 }
 
 type PutArgs struct {
-	key string
-	value string
+	Key string
+	Value string
 }
 
 type PutReply struct{}
@@ -26,12 +26,12 @@ type GetReply struct {
 	Value string
 }
 
-type Server interface {
+type Server_t interface {
 	Get(key string, reply *GetReply) error
 	Put(key, value string, reply *GetReply) error
 }
 
-func server() {
+func Server() {
 	KV := new(Kv)
 	KV.data = map[string]string{}
 
@@ -58,14 +58,16 @@ func server() {
 
 func (KV *Kv) Get(args *GetArgs, reply *GetReply) error {
 	KV.mu.Lock()
-	reply.Value = KV.data[args.key]
-	KV.mu.Unlock()
+	defer KV.mu.Unlock()
+
+	reply.Value = KV.data[args.Key]
 	return nil
 }
 
 func (KV *Kv) Put(args *PutArgs, reply *PutReply) error {
 	KV.mu.Lock()
-	KV.data[args.key] = args.value
-	KV.mu.Unlock()
+	defer KV.mu.Unlock()
+
+	KV.data[args.Key] = args.Value
 	return nil
 }
