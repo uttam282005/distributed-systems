@@ -1,52 +1,40 @@
 package client
 
 import (
-	"net/rpc"
-	types "rpc-example/types"
+    "net/rpc"
+    "rpc-example/types"
 )
 
-type Client struct {
-	client *rpc.Client
+type KVClient struct {
+    c *rpc.Client
 }
 
-func Connect() (*Client, error) {
-	client, e := rpc.Dial("tcp", "8000")
-	if e != nil {
-		return nil, nil
-	}
-	return  &Client{
-		client,
-	} , nil
+func Connect() (*KVClient, error) {
+    c, err := rpc.Dial("tcp", "localhost:8000")
+    if err != nil {
+        return nil, err
+    }
+    return &KVClient{c: c}, nil
 }
 
-func (c *Client) Get(key string) string {
-	client := c.client
-	defer client.Close()
-
-	args := types.GetArgs {
-		Key: key,
-	} 
-	reply := types.GetReply{}
-	e := client.Call("KV.Get", &args, &reply)
-	if e != nil {
-		return "" 
-	}
-	return reply.Value
+func (kv *KVClient) Close() {
+    kv.c.Close()
 }
 
-func (c *Client) Put(key string, val string) error {
-	client := c.client
-	defer client.Close()
-
-	args := types.PutArgs{ Key: key, Value: val }
-	reply := types.PutReply{}
-	err := client.Call("KV.Put", &args, &reply)
-	if err != nil {
-		return err
-	}
-	return nil
+func (kv *KVClient) Get(key string) (string, error) {
+    args := &types.GetArgs{Key: key}
+    var reply types.GetReply
+    err := kv.c.Call("Kv.Get", args, &reply)
+    if err != nil {
+        return "", err
+    }
+    return reply.Value, nil
 }
 
-func (c *Client) Close() {
-	c.client.Close()
+func (kv *KVClient) Put(key, value string) error {
+    args := &types.PutArgs{Key: key, Value: value}
+    var reply types.PutReply
+    err := kv.c.Call("Kv.Put", args, &reply)
+    return err
 }
+
