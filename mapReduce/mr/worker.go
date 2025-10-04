@@ -23,7 +23,7 @@ type GetJobReply struct {
 	FileName string
 	JobId    int
 	NReduce  int
-	JobType  string 
+	Type  string
 }
 
 type JobDoneArgs struct{}
@@ -80,6 +80,7 @@ func handleMapJob(
 	return true
 }
 
+func notifyCoordinatorDone() {}
 
 func Worker(
 	mapf func(string, string) []KeyValue,
@@ -101,24 +102,18 @@ func Worker(
 			break
 		}
 
-		// Copy reply to avoid data race
-		job := reply
+		switch reply.Type {
+		case "map":
+			handleMapJob(reply.FileName, mapf, reply.JobId, reply.NReduce)
+		case "reduce":
+			// handleReduceJob(...)
+		}
 
-		go func(job GetJobReply) {
-			ok := handleMapJob(job.FileName, mapf, job.JobId, reply.NReduce)
-			if ok {
-				doneArgs := JobDoneArgs{}
-				doneReply := JobDoneReply{}
-				call("Coordinator.Done", &doneArgs, &doneReply)
-			} else {
-				log.Printf("Worker: job %d failed on file %v", job.JobId, job.FileName)
-			}
-		}(job)
+		notifyCoordinatorDone()
 
 		time.Sleep(500 * time.Millisecond) // avoid hot-looping
 	}
 }
-
 
 // send an RPC request to the coordinator, wait for the response.
 // usually returns true.
