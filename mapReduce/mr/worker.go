@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/rpc"
 	"os"
+	"sort"
 	"time"
 )
 
@@ -23,7 +24,7 @@ type GetJobReply struct {
 	FileName string
 	JobId    int
 	NReduce  int
-	Type  string
+	Type     string
 }
 
 type JobDoneArgs struct{}
@@ -80,7 +81,69 @@ func handleMapJob(
 	return true
 }
 
-func notifyCoordinatorDone() {}
+func notifyCoordinatorDone() {
+	for {
+		args := JobDoneArgs{}
+		reply := JobDoneReply{}
+		ok := call("Coordinator.Done", &args, &reply)
+		if !ok {
+			time.Sleep(2 * time.Second)
+			continue
+		}
+		break
+	}
+}
+
+func handleReduceJob(
+	reduceTaskId int,
+	reducef func(string, []string) string,
+	nMap int,
+) bool {
+	outputFileName := fmt.Sprintf("mr-out-%d", reduceTaskId)
+	outputFile, err := os.Create(outputFileName)
+	defer outputFile.Close()
+
+	if err != nil {
+		log.Fatalf("cannot create outputfile %v", outputFileName)
+	}
+
+	var files []*os.File
+	for m := 0; m < nMap; m++ {
+		fileName := fmt.Sprintf("mr-%d-%d", m, reduceTaskId)
+		if f, err := os.Open(fileName); err == nil {
+			files = append(files, f)
+		}  
+	}
+
+	for _, file := range files {
+		kva := []KeyValue{}
+		var kv KeyValue
+		dec := json.NewDecoder(file)
+		for {
+			if err := dec.Decode(&kv); err != nil {
+				break
+			}
+			kva = append(kva, kv)
+		}
+
+		sort.Slice(kva, func(i, j int) bool {
+			return kva[i].Key < kva[j].Key
+		})
+
+		kvmap := make(map[string][]string)
+		for _, kv := range kva {
+			kvmap[kv.Key] = append(kvmap[kv.Key], kv.Value)
+		}
+
+		for k, v := range kvmap {
+			output := reducef(k, v)
+			fmt.Fprintf(outputFile, "%v %v\n", k, output)
+		}
+
+		file.Close()
+	}
+	return true
+}
 
 func Worker(
 	mapf func(string, string) []KeyValue,
@@ -106,7 +169,7 @@ func Worker(
 		case "map":
 			handleMapJob(reply.FileName, mapf, reply.JobId, reply.NReduce)
 		case "reduce":
-			// handleReduceJob(...)
+			handleReduceJob()
 		}
 
 		notifyCoordinatorDone()
