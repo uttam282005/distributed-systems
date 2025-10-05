@@ -99,49 +99,60 @@ func handleReduceJob(
 	reducef func(string, []string) string,
 	nMap int,
 ) bool {
-	outputFileName := fmt.Sprintf("mr-out-%d", reduceTaskId)
-	outputFile, err := os.Create(outputFileName)
-	defer outputFile.Close()
+	kva := []KeyValue{}
 
-	if err != nil {
-		log.Fatalf("cannot create outputfile %v", outputFileName)
-	}
-
-	var files []*os.File
+	// Read all intermediate files
 	for m := 0; m < nMap; m++ {
 		fileName := fmt.Sprintf("mr-%d-%d", m, reduceTaskId)
-		if f, err := os.Open(fileName); err == nil {
-			files = append(files, f)
-		}  
-	}
+		file, err := os.Open(fileName)
+		if err != nil {
+			continue
+		}
 
-	for _, file := range files {
-		kva := []KeyValue{}
-		var kv KeyValue
 		dec := json.NewDecoder(file)
 		for {
+			var kv KeyValue
 			if err := dec.Decode(&kv); err != nil {
 				break
 			}
 			kva = append(kva, kv)
 		}
-
-		sort.Slice(kva, func(i, j int) bool {
-			return kva[i].Key < kva[j].Key
-		})
-
-		kvmap := make(map[string][]string)
-		for _, kv := range kva {
-			kvmap[kv.Key] = append(kvmap[kv.Key], kv.Value)
-		}
-
-		for k, v := range kvmap {
-			output := reducef(k, v)
-			fmt.Fprintf(outputFile, "%v %v\n", k, output)
-		}
-
 		file.Close()
 	}
+
+	// Group by keys
+	sort.Slice(kva, func(i, j int) bool {
+		return kva[i].Key < kva[j].Key
+	})
+
+	outputFileName := fmt.Sprintf("mr-out-%d", reduceTaskId)
+	tempFileName := fmt.Sprintf("%s.tmp", outputFileName)
+	outputFile, err := os.Create(tempFileName)
+	if err != nil {
+		log.Fatalf("cannot create output file %v", outputFileName)
+	}
+	defer outputFile.Close()
+
+	// Aggregreate values for each key and call the reduce func
+	i := 0
+	for i < len(kva) {
+		j := i + 1
+		for j < len(kva) && kva[j].Key == kva[i].Key {
+			j++
+		}
+		values := []string{}
+		for k := i; k < j; k++ {
+			values = append(values, kva[k].Value)
+		}
+
+		output := reducef(kva[i].Key, values)
+		fmt.Fprintf(outputFile, "%v %v\n", kva[i].Key, output)
+
+		i = j
+	}
+
+	// To make sure that there are no half written output files
+	os.Rename(tempFileName, outputFileName)
 	return true
 }
 
