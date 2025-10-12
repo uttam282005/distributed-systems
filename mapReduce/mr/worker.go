@@ -12,7 +12,8 @@ import (
 	"time"
 )
 
-// Map functions return a slice of KeyValue.
+
+// KeyValue is a type used to hold the key/value pairs
 type KeyValue struct {
 	Key   string
 	Value string
@@ -22,7 +23,7 @@ type GetJobArgs struct{}
 
 type GetJobReply struct {
 	FileName string
-	JobId    int
+	JobID    int
 	NReduce  int
 	Type     string
 }
@@ -32,13 +33,13 @@ type JobDoneArgs struct{}
 type JobDoneReply struct{}
 
 // use ihash(key) % NReduce to choose the reduce
-// task number for each KeyValue emitted by Map.
 func ihash(key string) int {
 	h := fnv.New32a()
 	h.Write([]byte(key))
 	return int(h.Sum32() & 0x7fffffff)
 }
 
+// Hanldle the map job
 func handleMapJob(
 	fileName string,
 	mapf func(string, string) []KeyValue,
@@ -81,6 +82,7 @@ func handleMapJob(
 	return true
 }
 
+// Notify the coordinator that the job is done
 func notifyCoordinatorDone() {
 	for {
 		args := JobDoneArgs{}
@@ -94,6 +96,7 @@ func notifyCoordinatorDone() {
 	}
 }
 
+// Handle the reduce job 
 func handleReduceJob(
 	reduceTaskId int,
 	reducef func(string, []string) string,
@@ -102,7 +105,7 @@ func handleReduceJob(
 	kva := []KeyValue{}
 
 	// Read all intermediate files
-	for m := 0; m < nMap; m++ {
+	for m := range nMap {
 		fileName := fmt.Sprintf("mr-%d-%d", m, reduceTaskId)
 		file, err := os.Open(fileName)
 		if err != nil {
@@ -156,6 +159,7 @@ func handleReduceJob(
 	return true
 }
 
+// Worker main loop
 func Worker(
 	mapf func(string, string) []KeyValue,
 	reducef func(string, []string) string,
@@ -178,9 +182,9 @@ func Worker(
 
 		switch reply.Type {
 		case "map":
-			handleMapJob(reply.FileName, mapf, reply.JobId, reply.NReduce)
+			handleMapJob(reply.FileName, mapf, reply.JobID, reply.NReduce)
 		case "reduce":
-			handleReduceJob()
+			handleReduceJob(reply.JobID, reducef, reply.NReduce)
 		}
 
 		notifyCoordinatorDone()
@@ -189,9 +193,7 @@ func Worker(
 	}
 }
 
-// send an RPC request to the coordinator, wait for the response.
-// usually returns true.
-// returns false if something goes wrong.
+// Send an RPC request to the coordinator, wait for the response.
 func call(rpcname string, args any, reply any) bool {
 	// c, err := rpc.DialHTTP("tcp", "127.0.0.1"+":1234")
 	sockname := coordinatorSock()

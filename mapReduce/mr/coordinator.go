@@ -1,37 +1,47 @@
+// Package mr This file contains the implementation of the Coordinator for a MapReduce system.
 package mr
 
-import "log"
-import "net"
-import "os"
-import "net/rpc"
-import "net/http"
+import (
+	"log"
+	"net"
+	"net/http"
+	"net/rpc"
+	"os"
+	"sync"
+)
 
-
-type Coordinator struct {
-	// Your definitions here.
-
+type Job struct {
+	JobID    int
+	Type     string
+	FileName string
 }
 
-// Your code here -- RPC handlers for the worker to call.
+type MetaData struct {
+	Nreduce int
+	Nmap    int
+}
 
-//
-// an example RPC handler.
-//
-// the RPC argument and reply types are defined in rpc.go.
-//
-func (c *Coordinator) Example(args *ExampleArgs, reply *ExampleReply) error {
-	reply.Y = args.X + 1
+type Coordinator struct {
+	mu sync.Mutex
+
+	Jobs  []Job
+	phase string
+
+	NReduce int
+	Nmap    int
+}
+
+// GetJob RPC handlers for the worker to call.
+func(c *Coordinator) GetJob(args *GetJobArgs, reply *GetJobReply) error {
+
 	return nil
 }
 
-
-//
 // start a thread that listens for RPCs from worker.go
-//
 func (c *Coordinator) server() {
 	rpc.Register(c)
 	rpc.HandleHTTP()
-	//l, e := net.Listen("tcp", ":1234")
+	// l, e := net.Listen("tcp", ":1234")
 	sockname := coordinatorSock()
 	os.Remove(sockname)
 	l, e := net.Listen("unix", sockname)
@@ -41,24 +51,17 @@ func (c *Coordinator) server() {
 	go http.Serve(l, nil)
 }
 
-//
-// main/mrcoordinator.go calls Done() periodically to find out
+// Done is called periodically by the workers to find out
 // if the entire job has finished.
-//
 func (c *Coordinator) Done() bool {
 	ret := false
 
 	// Your code here.
 
-
 	return ret
 }
 
-//
-// create a Coordinator.
-// main/mrcoordinator.go calls this function.
-// nReduce is the number of reduce tasks to use.
-//
+// MakeCoordinator creates a Coordinator.
 func MakeCoordinator(files []string, nReduce int) *Coordinator {
 	c := Coordinator{}
 
