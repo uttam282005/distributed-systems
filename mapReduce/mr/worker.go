@@ -1,6 +1,7 @@
 package mr
 
 import (
+	"math/rand/v2"
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
@@ -12,11 +13,14 @@ import (
 	"time"
 )
 
-
 // KeyValue is a type used to hold the key/value pairs
 type KeyValue struct {
 	Key   string
 	Value string
+}
+
+type Worker struct {
+	WorkerID string
 }
 
 type GetJobArgs struct{}
@@ -28,7 +32,9 @@ type GetJobReply struct {
 	Type     string
 }
 
-type JobDoneArgs struct{}
+type JobDoneArgs struct {
+	JobID int
+}
 
 type JobDoneReply struct{}
 
@@ -39,11 +45,32 @@ func ihash(key string) int {
 	return int(h.Sum32() & 0x7fffffff)
 }
 
+func MakeWorker() (*Worker ,error) {
+	worker := Worker{}
+	id := fmt.Sprintf("%d-%d-%d", time.Now().UnixNano(), os.Getpid(), rand.IntN(1e6))
+	worker.WorkerID = id
+	err := worker.Register()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create worker: %v", worker.WorkerID)
+	}
+	return &worker, nil
+}
+
+func (w *Worker) Register() error {
+	args := RegisterWorkerArgs{w.WorkerID}
+	reply := RegisterWorkerReply{}
+	ok := call("Coordinator.RegisterWorker", &args, &reply)
+	if !ok {
+		log.Fatalf("failed to register worker %v", w.WorkerID)
+		return fmt.Errorf("")
+	}
+}
+
 // Hanldle the map job
 func handleMapJob(
 	fileName string,
 	mapf func(string, string) []KeyValue,
-	mapTaskId int,
+	mapTaskID int,
 	nReduce int,
 ) bool {
 	inputFile, err := os.Open(fileName)
@@ -62,7 +89,7 @@ func handleMapJob(
 	enc := make([]*json.Encoder, nReduce)
 
 	for r := range nReduce {
-		intermediateFile := fmt.Sprintf("mr-%d-%d", mapTaskId, r)
+		intermediateFile := fmt.Sprintf("mr-%d-%d", mapTaskID, r)
 		f, err := os.Create(intermediateFile)
 		if err != nil {
 			log.Fatalf("cannot create intermediate file %v", intermediateFile)
@@ -72,8 +99,8 @@ func handleMapJob(
 	}
 
 	for _, kv := range mapgoResult {
-		reduceTaskId := ihash(kv.Key) % nReduce
-		err := enc[reduceTaskId].Encode(&kv)
+		reduceTaskID := ihash(kv.Key) % nReduce
+		err := enc[reduceTaskID].Encode(&kv)
 		if err != nil {
 			log.Fatal("cannot encode map result")
 		}
@@ -83,9 +110,11 @@ func handleMapJob(
 }
 
 // Notify the coordinator that the job is done
-func notifyCoordinatorDone() {
+func notifyCoordinatorDone(JobID int) {
 	for {
-		args := JobDoneArgs{}
+		args := JobDoneArgs{
+			JobID,
+		}
 		reply := JobDoneReply{}
 		ok := call("Coordinator.Done", &args, &reply)
 		if !ok {
@@ -96,9 +125,9 @@ func notifyCoordinatorDone() {
 	}
 }
 
-// Handle the reduce job 
+// Handle the reduce job
 func handleReduceJob(
-	reduceTaskId int,
+	reduceTaskID int,
 	reducef func(string, []string) string,
 	nMap int,
 ) bool {
@@ -106,7 +135,7 @@ func handleReduceJob(
 
 	// Read all intermediate files
 	for m := range nMap {
-		fileName := fmt.Sprintf("mr-%d-%d", m, reduceTaskId)
+		fileName := fmt.Sprintf("mr-%d-%d", m, reduceTaskID)
 		file, err := os.Open(fileName)
 		if err != nil {
 			continue
@@ -128,7 +157,7 @@ func handleReduceJob(
 		return kva[i].Key < kva[j].Key
 	})
 
-	outputFileName := fmt.Sprintf("mr-out-%d", reduceTaskId)
+	outputFileName := fmt.Sprintf("mr-out-%d", reduceTaskID)
 	tempFileName := fmt.Sprintf("%s.tmp", outputFileName)
 	outputFile, err := os.Create(tempFileName)
 	if err != nil {
@@ -160,7 +189,7 @@ func handleReduceJob(
 }
 
 // Worker main loop
-func Worker(
+func startWorker(
 	mapf func(string, string) []KeyValue,
 	reducef func(string, []string) string,
 ) {
@@ -187,7 +216,7 @@ func Worker(
 			handleReduceJob(reply.JobID, reducef, reply.NReduce)
 		}
 
-		notifyCoordinatorDone()
+		notifyCoordinatorDone(reply.JobID)
 
 		time.Sleep(500 * time.Millisecond) // avoid hot-looping
 	}

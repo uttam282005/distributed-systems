@@ -25,15 +25,50 @@ type Coordinator struct {
 	mu sync.Mutex
 
 	Jobs  []Job
+	Workers []Worker
 	phase string
 
 	NReduce int
 	Nmap    int
 }
+// map job 
+// file 
+// id 
+// create jobs from input filess
+func(c *Coordinator) createJobs(files []string) []Job {
+	var jobs []Job
+	for i, file := range files {
+		job := Job {
+			i,
+			c.phase,
+			file,
+		}
+		jobs = append(jobs, job)
+	}
+	return jobs
+}
+
+type RegisterWorkerArgs struct {
+	WorkerID string 
+}
+
+type RegisterWorkerReply struct {
+}
 
 // GetJob RPC handlers for the worker to call.
 func(c *Coordinator) GetJob(args *GetJobArgs, reply *GetJobReply) error {
+	return nil
+}
 
+func(c *Coordinator) RegisterWorker(args *RegisterWorkerArgs, reply *RegisterWorkerReply) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	worker := Worker {
+		args.WorkerID,
+	}
+
+	c.Workers = append(c.Workers, worker)
 	return nil
 }
 
@@ -51,20 +86,18 @@ func (c *Coordinator) server() {
 	go http.Serve(l, nil)
 }
 
-// Done is called periodically by the workers to find out
+// Done is called periodically by the client to find out
 // if the entire job has finished.
 func (c *Coordinator) Done() bool {
 	ret := false
-
 	// Your code here.
-
 	return ret
 }
 
 // MakeCoordinator creates a Coordinator.
 func MakeCoordinator(files []string, nReduce int) *Coordinator {
 	c := Coordinator{}
-
+	c.Jobs = c.createJobs(files)
 	c.server()
 	return &c
 }
