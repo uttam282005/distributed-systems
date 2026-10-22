@@ -156,7 +156,7 @@ sequenceDiagram
     T1->>TT: TT.now() -> [earliest_1, latest_1]
     Note over T1: Pick commit timestamp s1 = latest_1
     Note over T1: Commit Wait: Pause until TT.now().earliest > s1
-    Note over T1: Locks released; writes visible
+    Note over T1: Locks released, writes visible
     
     Note over T2: T2 begins in real time after T1 committed
     T2->>TT: TT.now() -> [earliest_2, latest_2]

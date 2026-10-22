@@ -96,11 +96,11 @@ sequenceDiagram
     participant R2 as Reader 2
 
     Note over W: write(x = 1) starts
-    Note over R1: read() overlaps write(1); returns NEW value 1!
+    Note over R1: read() overlaps write(1), returns NEW value 1!
     Note over R1: R1 finishes read()
     
     Note over R2: R2 begins read AFTER R1 finished!
-    Note over R2: R2 overlaps write(1); returns OLD value 0!
+    Note over R2: R2 overlaps write(1), returns OLD value 0!
     Note over W: write(x = 1) finishes
 ```
 

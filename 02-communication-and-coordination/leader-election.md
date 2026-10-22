@@ -138,7 +138,7 @@ sequenceDiagram
 
     Note over L1: L1 is Leader in Term 1
     Note over L1: L1 experiences a 30s Stop-The-World GC Pause!
-    Note over Q: Quorum times out waiting for L1; increments Term to 2
+    Note over Q: Quorum times out waiting for L1, increments Term to 2
     Q->>L2: Elect L2 Leader in Term 2 (Token = 2)
     L2->>Storage: write(data, Token = 2)
     Note over Storage: Storage records highest token seen: 2. Write OK.

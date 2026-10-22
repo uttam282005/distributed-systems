@@ -62,7 +62,7 @@ sequenceDiagram
     
     Note over C2: inv: read(x) (Started AFTER write completed)
     Note over S: LINEARIZATION POINT: read takes effect!
-    Note over C2: resp: 1 (MUST return 1; returning 0 is FORBIDDEN)
+    Note over C2: resp 1 (MUST return 1, returning 0 is FORBIDDEN)
 ```
 
 Because Client 2's read started after Client 1's write finished in real time ($op_1 \prec_H op_2$), its linearization point must occur after $op_1$'s linearization point. Therefore, it **must observe $1$**.
@@ -117,11 +117,11 @@ gantt
     dateFormat X
     axisFormat %s
     section Write
-    W1: write(1) : 10, 50
+    W1 write(1) : 10, 50
     section Reader 1
-    R1: read() -> 1 : 20, 30
+    R1 read returns 1 : 20, 30
     section Reader 2
-    R2: read() -> 0 : 35, 45
+    R2 read returns 0 : 35, 45
 ```
 
 #### Why is this execution NOT linearizable?
