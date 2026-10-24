@@ -147,7 +147,7 @@ If replica $R_1$ is partitioned or delayed, a client reading locally from $R_1$ 
 1. **Quorum Read Verification (ReadIndex in Raft)**:
    The leader receives a read request. Before answering, it exchanges heartbeat messages with a majority quorum to verify it has not been deposed by a new leader.
 2. **Leader Leases**:
-   The leader acquires a bounded physical time lease from replicas. As long as local physical time $t < t_{\text{lease\_start}} + \text{duration} - \Delta_{\text{skew}}$, the leader serves reads locally from memory.
+   The leader acquires a bounded physical time lease from replicas. As long as local physical time $t < t_{\text{lease start}} + \text{duration} - \Delta_{\text{skew}}$, the leader serves reads locally from memory.
 
 ---
 
